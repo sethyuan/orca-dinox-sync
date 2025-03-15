@@ -159,6 +159,7 @@ export async function unload() {
 async function syncNote(note: any, inbox: Block, noteTag: string) {
   let noteBlock: Block
 
+  // Perform a query to see if there is an existing note.
   const resultIds = (await orca.invokeBackend("query", {
     q: {
       kind: 1,
@@ -182,6 +183,7 @@ async function syncNote(note: any, inbox: Block, noteTag: string) {
       orca.state.blocks[noteBlock.id] = noteBlock
     }
 
+    // Clear the tags of the existing note.
     await orca.commands.invokeEditorCommand(
       "core.editor.setProperties",
       null,
@@ -189,6 +191,7 @@ async function syncNote(note: any, inbox: Block, noteTag: string) {
       [{ name: "_tags", type: 2, value: [] }],
     )
 
+    // Clear the children of the existing note.
     if (noteBlock.children.length > 0) {
       await orca.commands.invokeEditorCommand(
         "core.editor.deleteBlocks",
@@ -217,6 +220,7 @@ async function syncNote(note: any, inbox: Block, noteTag: string) {
     noteTag,
     [{ name: "ID", type: 1, value: note.noteId }],
   )
+  // Add the ID tag property if it doesn't exist.
   const tagBlock = orca.state.blocks[tagBlockId]
   if (!tagBlock.properties?.some((p) => p.name === "ID")) {
     await orca.commands.invokeEditorCommand(
@@ -227,6 +231,7 @@ async function syncNote(note: any, inbox: Block, noteTag: string) {
     )
   }
 
+  // Add note tags.
   if (note.tags?.length) {
     for (const tag of note.tags) {
       await orca.commands.invokeEditorCommand(
@@ -238,6 +243,7 @@ async function syncNote(note: any, inbox: Block, noteTag: string) {
     }
   }
 
+  // Insert the content of the note.
   await orca.commands.invokeEditorCommand(
     "core.editor.batchInsertText",
     null,
@@ -246,6 +252,7 @@ async function syncNote(note: any, inbox: Block, noteTag: string) {
     note.contentMd,
   )
 
+  // Insert the audio if available.
   if (note.audioDetail?.remote) {
     await orca.commands.invokeEditorCommand(
       "core.editor.insertBlock",
