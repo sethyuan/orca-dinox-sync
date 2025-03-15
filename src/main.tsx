@@ -2,7 +2,7 @@ import { formatDate, startOfDay } from "date-fns"
 import LogoImg from "../icon.png"
 import { setupL10N, t } from "./libs/l10n"
 import { ensureInbox, groupBy } from "./libs/utils"
-import { Block } from "./orca"
+import type { Block, DbId, QueryDescription } from "./orca"
 import zhCN from "./translations/zhCN"
 
 let pluginName: string
@@ -32,6 +32,12 @@ export async function load(_name: string) {
       type: "string",
       defaultValue: "Dinox Inbox",
     },
+    noteTag: {
+      label: t("Note tag"),
+      description: t("The tag applied to imported notes."),
+      type: "string",
+      defaultValue: "Dinox Note",
+    },
   })
 
   orca.themes.injectCSSResource(`${pluginName}/dist/main.css`, pluginName)
@@ -50,7 +56,10 @@ export async function load(_name: string) {
           return
         }
 
+        orca.notify("info", t("Starting to sync, please wait..."))
+
         const inboxName = settings?.inboxName || "Dinox Inbox"
+        const noteTag = settings?.noteTag || "Dinox Note"
 
         const syncKey =
           (await orca.plugins.getData(pluginName, "syncKey")) ??
@@ -99,45 +108,7 @@ export async function load(_name: string) {
               const inbox = await ensureInbox(journal, inboxName)
 
               for (const note of notesInDate) {
-                const noteBlockId = await orca.commands.invokeEditorCommand(
-                  "core.editor.insertBlock",
-                  null,
-                  inbox,
-                  "lastChild",
-                  [{ t: "t", v: note.title }],
-                )
-
-                if (note.tags?.length) {
-                  for (const tag of note.tags) {
-                    await orca.commands.invokeEditorCommand(
-                      "core.editor.insertTag",
-                      null,
-                      noteBlockId,
-                      tag,
-                    )
-                  }
-                }
-
-                const noteBlock = orca.state.blocks[noteBlockId]
-
-                await orca.commands.invokeEditorCommand(
-                  "core.editor.batchInsertText",
-                  null,
-                  noteBlock,
-                  "firstChild",
-                  note.contentMd,
-                )
-
-                if (note.audioDetail?.remote) {
-                  await orca.commands.invokeEditorCommand(
-                    "core.editor.insertBlock",
-                    null,
-                    noteBlock,
-                    "firstChild",
-                    null,
-                    { type: "audio", src: note.audioDetail.remote },
-                  )
-                }
+                await syncNote(note, inbox, noteTag)
               }
             }
           })
@@ -183,4 +154,106 @@ export async function unload() {
   orca.themes.removeCSSResources(pluginName)
 
   console.log(`${pluginName} unloaded.`)
+}
+
+async function syncNote(note: any, inbox: Block, noteTag: string) {
+  let noteBlock: Block
+
+  const resultIds = (await orca.invokeBackend("query", {
+    q: {
+      kind: 1,
+      conditions: [
+        {
+          kind: 4,
+          name: noteTag,
+          properties: [{ name: "ID", op: 1, value: note.noteId }],
+        },
+      ],
+    },
+    pageSize: 1,
+  } as QueryDescription)) as DbId[]
+
+  if (resultIds.length > 0) {
+    const noteBlockId = resultIds[0]
+    noteBlock = orca.state.blocks[noteBlockId]
+    if (noteBlock == null) {
+      noteBlock = await orca.invokeBackend("get-block", noteBlockId)
+      if (noteBlock == null) return
+      orca.state.blocks[noteBlock.id] = noteBlock
+    }
+
+    await orca.commands.invokeEditorCommand(
+      "core.editor.setProperties",
+      null,
+      [noteBlock.id],
+      [{ name: "_tags", type: 2, value: [] }],
+    )
+
+    if (noteBlock.children.length > 0) {
+      await orca.commands.invokeEditorCommand(
+        "core.editor.deleteBlocks",
+        null,
+        [...noteBlock.children],
+      )
+    }
+  } else {
+    const noteBlockId = await orca.commands.invokeEditorCommand(
+      "core.editor.insertBlock",
+      null,
+      inbox,
+      "lastChild",
+      [{ t: "t", v: note.title }],
+      { type: "text" },
+      new Date(note.createTime),
+      new Date(note.updateTime),
+    )
+    noteBlock = orca.state.blocks[noteBlockId]
+  }
+
+  const tagBlockId = await orca.commands.invokeEditorCommand(
+    "core.editor.insertTag",
+    null,
+    noteBlock.id,
+    noteTag,
+    [{ name: "ID", type: 1, value: note.noteId }],
+  )
+  const tagBlock = orca.state.blocks[tagBlockId]
+  if (!tagBlock.properties?.some((p) => p.name === "ID")) {
+    await orca.commands.invokeEditorCommand(
+      "core.editor.setProperties",
+      null,
+      [tagBlock.id],
+      [{ name: "ID", type: 1 }],
+    )
+  }
+
+  if (note.tags?.length) {
+    for (const tag of note.tags) {
+      await orca.commands.invokeEditorCommand(
+        "core.editor.insertTag",
+        null,
+        noteBlock.id,
+        tag,
+      )
+    }
+  }
+
+  await orca.commands.invokeEditorCommand(
+    "core.editor.batchInsertText",
+    null,
+    noteBlock,
+    "firstChild",
+    note.contentMd,
+  )
+
+  if (note.audioDetail?.remote) {
+    await orca.commands.invokeEditorCommand(
+      "core.editor.insertBlock",
+      null,
+      noteBlock,
+      "firstChild",
+      null,
+      { type: "audio", src: note.audioDetail.remote },
+    )
+  }
 }

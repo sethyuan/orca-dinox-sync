@@ -11,6 +11,9 @@ const zhCN = {
   "Failed to sync Dinox notes.": "从Dinox导入新笔记失败。",
   "Dinox notes synced successfully.": "从Dinox导入新笔记成功。",
   "Nothing to sync.": "没有需要同步的内容。",
+  "Starting to sync, please wait...": "开始同步，请稍后……",
+  "Note tag": "笔记标签",
+  "The tag applied to imported notes.": "导入的笔记将使用该标签。",
 }
 
 export default zhCN
