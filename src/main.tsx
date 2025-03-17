@@ -126,7 +126,7 @@ export async function load(_name: string) {
           orca.notify("error", t("Failed to sync Dinox notes."))
         }
       },
-      t("Sync new notes"),
+      t("Sync Dinox notes"),
     )
   }
 
