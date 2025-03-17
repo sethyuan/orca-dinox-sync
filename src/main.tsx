@@ -1,7 +1,7 @@
-import { formatDate, startOfDay } from "date-fns"
+import { formatDate } from "date-fns"
 import LogoImg from "../icon.png"
 import { setupL10N, t } from "./libs/l10n"
-import { ensureInbox, groupBy } from "./libs/utils"
+import { ensureInbox } from "./libs/utils"
 import type { Block, DbId, QueryDescription } from "./orca"
 import zhCN from "./translations/zhCN"
 
@@ -85,23 +85,16 @@ export async function load(_name: string) {
             },
           )
           const json = await res.json()
-          const notes = json.data?.[0]?.notes?.filter(
-            (note: any) => !note.isDel,
-          ) as any[]
+          const notes = json.data as any[]
 
           if (!notes?.length) {
             orca.notify("info", t("Nothing to sync."))
             return
           }
 
-          const notesByDate = groupBy<Date, any>(
-            (note) => startOfDay(note.createTime).getTime(),
-            notes,
-          )
-
           await orca.commands.invokeGroup(async () => {
-            for (const [date, notesInDate] of notesByDate.entries()) {
-              const createdAt = new Date(date)
+            for (const { date, notes: notesInDate } of notes) {
+              const createdAt = new Date(`${date} 00:00:00`)
               const journal: Block = await orca.invokeBackend(
                 "get-journal-block",
                 createdAt,
@@ -123,6 +116,7 @@ export async function load(_name: string) {
 
           orca.notify("success", t("Dinox notes synced successfully."))
         } catch (err) {
+          console.error("DINOX SYNC:", err)
           orca.notify("error", t("Failed to sync Dinox notes."))
         }
       },
@@ -262,13 +256,17 @@ async function syncNote(note: any, inbox: Block, noteTag: string) {
   }
 
   // Insert the content of the note.
-  await orca.commands.invokeEditorCommand(
-    "core.editor.batchInsertText",
-    null,
-    noteBlock,
-    "firstChild",
-    note.contentMd,
-  )
+  try {
+    await orca.commands.invokeEditorCommand(
+      "core.editor.batchInsertText",
+      null,
+      noteBlock,
+      "firstChild",
+      note.contentMd,
+    )
+  } catch (err) {
+    console.error("DINOX SYNC:", err, note.contentMd)
+  }
 
   // Insert the audio if available.
   if (note.audioDetail?.remote) {
