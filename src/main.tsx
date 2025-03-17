@@ -13,8 +13,9 @@ export async function load(_name: string) {
   // Your plugin code goes here.
   setupL10N(orca.state.locale, { "zh-CN": zhCN })
 
-  const Tooltip = orca.components.Tooltip
   const Button = orca.components.Button
+  const HoverContextMenu = orca.components.HoverContextMenu
+  const MenuText = orca.components.MenuText
 
   await orca.plugins.setSettingsSchema(pluginName, {
     token: {
@@ -45,7 +46,7 @@ export async function load(_name: string) {
   if (orca.state.commands["dinox.sync"] == null) {
     orca.commands.registerCommand(
       "dinox.sync",
-      async () => {
+      async (fullSync: boolean = false) => {
         const settings = orca.state.plugins[pluginName].settings
 
         if (!settings?.token) {
@@ -61,9 +62,10 @@ export async function load(_name: string) {
         const inboxName = settings?.inboxName || "Dinox Inbox"
         const noteTag = settings?.noteTag || "Dinox Note"
 
-        const syncKey =
-          (await orca.plugins.getData(pluginName, "syncKey")) ??
-          "1900-01-01 00:00:00"
+        const syncKey = fullSync
+          ? "1900-01-01 00:00:00"
+          : (await orca.plugins.getData(pluginName, "syncKey")) ??
+            "1900-01-01 00:00:00"
         const now = new Date()
 
         try {
@@ -130,17 +132,33 @@ export async function load(_name: string) {
 
   if (orca.state.headbarButtons["dinox.sync"] == null) {
     orca.headbar.registerHeadbarButton("dinox.sync", () => (
-      <Tooltip
-        text={t("Sync new notes")}
-        shortcut={orca.state.shortcuts["dinox.sync"]}
+      <HoverContextMenu
+        menu={(closeMenu: () => void) => (
+          <>
+            <MenuText
+              title={t("Incremental sync")}
+              onClick={async () => {
+                closeMenu()
+                await orca.commands.invokeCommand("dinox.sync")
+              }}
+            />
+            <MenuText
+              title={t("Full sync")}
+              onClick={async () => {
+                closeMenu()
+                await orca.commands.invokeCommand("dinox.sync", true)
+              }}
+            />
+          </>
+        )}
       >
         <Button
           variant="plain"
-          onClick={() => orca.commands.invokeCommand("dinox.sync", null)}
+          onClick={() => orca.commands.invokeCommand("dinox.sync")}
         >
           <img className="dinox-button" src={LogoImg} alt="Sync" />
         </Button>
-      </Tooltip>
+      </HoverContextMenu>
     ))
   }
 

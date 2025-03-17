@@ -5,7 +5,8 @@ const zhCN = {
   "The text used for the block where imported notes are placed under.":
     "收件箱描述文字，导入的笔记将放在该块下。",
   "Import new notes from Dinox": "从Dinox导入新笔记",
-  "Sync new notes": "同步新笔记",
+  "Incremental sync": "增量同步",
+  "Full sync": "全量同步",
   "Please provide a Dinox API token in plugin settings.":
     "请在插件设置中提供Dinox的API token。",
   "Failed to sync Dinox notes.": "从Dinox导入新笔记失败。",
