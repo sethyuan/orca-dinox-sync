@@ -103,6 +103,7 @@ export async function load(_name: string) {
               const inbox = await ensureInbox(journal, inboxName)
 
               for (const note of notesInDate) {
+                if (note.isDel) continue
                 await syncNote(note, inbox, noteTag)
               }
             }
