@@ -212,6 +212,13 @@ async function syncNote(note: any, inbox: Block, noteTag: string) {
         [...noteBlock.children],
       )
     }
+
+    // Update title
+    await orca.commands.invokeEditorCommand(
+      "core.editor.setBlocksContent",
+      null,
+      [{ id: noteBlock.id, content: [{ t: "t", v: note.title }] }],
+    )
   } else {
     const noteBlockId = await orca.commands.invokeEditorCommand(
       "core.editor.insertBlock",
